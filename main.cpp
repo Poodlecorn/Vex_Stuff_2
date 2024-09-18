@@ -1,47 +1,39 @@
 #include "main.h"
-#include "lemlib/api.hpp"
+#include "pros/misc.h"
+
+#define LEFT_FRONT_MOTOR_PORT 1
+#define LEFT_BACK_MOTOR_PORT -2
+#define RIGHT_FRONT_MOTOR_PORT 4
+#define RIGHT_BACK_MOTOR_PORT -3
+#define FRONT_INTAKE_PORT 6
+#define MIDDLE_INTAKE_PORT 11
 
 
-// initialize motors/motor groups
-pros::MotorGroup left_mg({1,  2}, pros::MotorGearset::green);    // Creates a green motor group with forwards ports 1 & 2
-pros::MotorGroup right_mg({-3, -4}, pros::MotorGearset::green);  // Creates a green motor group with forwards port 3 & 4
-
-// drivetrain
-lemlib::Drivetrain drivetrain(&left_mg, &right_mg, /*[insert track width]*/lemlib::Omniwheel::NEW_325, 360, 2);
+// Create motor objects
 
 
-//initialize sensors
-pros::IMU imu 10; //inertial sensor/gyroscope
 
-//encoders for dead wheels
-pros::adi::Encoder encHor('A','B', false); 
-pros::adi::Encoder encVert('C','D', false);
+pros::Motor leftFrontMotor(LEFT_FRONT_MOTOR_PORT);
+pros::Motor leftBackMotor(LEFT_BACK_MOTOR_PORT );
+pros::Motor rightFrontMotor(RIGHT_FRONT_MOTOR_PORT);
+pros::Motor rightBackMotor(RIGHT_BACK_MOTOR_PORT);
 
-lemlib::TrackingWheel horWheel(&encHor, lemlib::Omniwheel::New_325, -5.75);
-lemlib::TrackingWheel vertWheel(&encVert, lemlib::Omniwheel::New_325, -2.5);
+pros::Motor intake1B(FRONT_INTAKE_PORT);
+pros::Motor intake2U(MIDDLE_INTAKE_PORT);
 
-//odometry settings
-lemlib::OdomSensors sensors(&encVert, nullptr, &encHor, nullprt, &imu);
 
-//
 
 
 
 /**
- * A callback function for LLEMU's center button.s
+ * A callback function for LLEMU's center button.
  *
  * When this callback is fired, it will toggle line 2 of the LCD text between
  * "I was pressed!" and nothing.
  */
-/*void on_center_button() {
-	static bool pressed = false;
-	pressed = !pressed;
-	if (pressed) {
-		pros::lcd::set_text(2, "I was pressed!");
-	} else {
-		pros::lcd::clear_line(2);
-	}
-}*/
+void on_center_button() {
+	
+}
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -51,13 +43,9 @@ lemlib::OdomSensors sensors(&encVert, nullptr, &encHor, nullprt, &imu);
  */
 void initialize() {
 	pros::lcd::initialize();
+	pros::lcd::set_text(1, "Hello PROS User!");
 
-	while true{
-		pros::lcd::print(0, "IMU", imu.get_value());
-		pros::lec::print(1, encHor.get_value());
-		pros::lec::print(2, encVert.get_value());
-		pros::delay(10);
-	}
+	pros::lcd::register_btn1_cb(on_center_button);
 }
 
 /**
@@ -89,7 +77,10 @@ void competition_initialize() {}
  * will be stopped. Re-enabling the robot will restart the task, not re-start it
  * from where it left off.
  */
-void autonomous() {}
+void autonomous() {
+
+
+}
 
 /**
  * Runs the operator control code. This function will be started in its own task
@@ -106,21 +97,58 @@ void autonomous() {}
  */
 void opcontrol() {
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
-
-
 	
 
+
 	while (true) {
-		/*pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
-		               (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
-		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);  // Prints status of the emulated screen LCDs*/
+		pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
+		                 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
+		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);  // Prints status of the emulated screen LCDs
+
+
+		//	intake code
+		if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
+
+			pros::lcd::set_text(2, "pressed");
+
+			intake1B.move(-60);
+			intake2U.move(-60);
+			
+			} 
+
+		else if (master.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
+			pros::lcd::set_text(3, "pressed!!");
+			intake1B.move_voltage(127);
+			intake2U.move_voltage(127);
+			}
+
+		else {
+			intake1B.move_voltage(0);
+			intake2U.move_voltage(0);
+			}
+
 
 		// Arcade control scheme
 		int dir = master.get_analog(ANALOG_LEFT_Y);    // Gets amount forward/backward from left joystick
-		int turn = master.get_analog(ANALOG_RIGHT_X);  // Gets the turn left/right from right joystick
-		left_mg.move(dir - turn);                      // Sets left motor voltage
-		right_mg.move(dir + turn);                     // Sets right motor voltage
-		pros::delay(20);                               // Run for 20 ms then update
-	}
+		int turn = master.get_analog(ANALOG_RIGHT_X);
+		int leftV = dir + turn; 
+		int rightV = dir - turn;
 
+//dead zone to prevent spinning in place when no joystick is pressed
+		if (abs(rightV)<= 10){ 
+		rightV = 0;
+	}
+		else if (abs(leftV) <=10){
+		leftV = 0;
+	}
+		   
+	leftFrontMotor.move_velocity(-leftV);
+    leftBackMotor.move_velocity(leftV);
+    rightFrontMotor.move_velocity(rightV);
+    rightBackMotor.move_velocity(-rightV);
+
+    
+
+                pros::delay(10);                               // Run for 10 ms then update
+	}
 }
